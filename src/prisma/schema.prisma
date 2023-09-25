@@ -1,0 +1,224 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int    @id @unique @default(autoincrement())
+  login    String @unique
+  password String
+  role     Role   @default(TRAINER)
+}
+
+enum Role {
+  ADMIN
+  MODERATOR
+  TRAINER
+}
+
+// Определение модели Тренера
+model Trainer {
+  id            Int               @id @unique @default(autoincrement())
+  full_name     String
+  date_of_birth DateTime
+  home_address  String
+  phone_number  String
+  teams         TrainerOnTeam[]
+  document      TrainerDocument[]
+}
+
+// Определение модели Команды
+model Team {
+  id        Int             @id @unique @default(autoincrement())
+  team_name String
+  trainer   TrainerOnTeam[]
+  athletes  AthelteOnTeam[]
+}
+
+// Определение модели Спортсмена
+model Athlete {
+  id                  Int                   @id @unique @default(autoincrement())
+  full_name           String
+  date_of_birth       DateTime?
+  home_address        String?
+  school_name         String?
+  join_date           DateTime?
+  initial_fee_amount  Float?
+  initial_fee_date    DateTime?
+  monthly_fee_amount  Float?
+  discount            Float?
+  has_discount        Boolean
+  additional_info     String?
+  insurance_from_club ClubInsurance?
+  personal_insurance  PersonalInsurance?
+  medical_examination MedicalExamination?
+  memberships         AthleteOnMembership[]
+  documents           AthleteDocument[]
+  payments            SubscriptionPayment[]
+  parents             AthelteOnParent[]
+  Team                AthelteOnTeam[]
+  createdAt           DateTime              @db.Date
+}
+
+// Определение модели Родителя
+model Parent {
+  id                   Int               @id @unique @default(autoincrement())
+  full_name            String
+  relationship         String?
+  workplace            String?
+  contact_phone        String?
+  parent_document_copy ParentDocument[]
+  athletes             AthelteOnParent[]
+  createdAt            DateTime          @db.Date
+}
+
+// Определение модели Документ Родителя
+model ParentDocument {
+  id             Int      @id @unique @default(autoincrement())
+  document_name  String
+  document_photo String
+  parent         Parent   @relation(fields: [parent_id], references: [id])
+  parent_id      Int
+  createdAt      DateTime @db.Date
+}
+
+// Определение модели Медицинского обследования
+model MedicalExamination {
+  id                Int       @id @unique @default(autoincrement())
+  from_club         Boolean
+  independent       Boolean
+  medical_report    String?
+  examination_date  DateTime?
+  contraindications String?
+  chronic_illnesses String?
+  allergies         String?
+  additional_info   String?
+  athlete           Athlete   @relation(fields: [athlete_id], references: [id])
+  athlete_id        Int       @unique
+}
+
+// Определение модели Страховки от клуба
+model ClubInsurance {
+  id             Int      @id @unique @default(autoincrement())
+  has_insurance  Boolean
+  insurance_date DateTime
+  athlete        Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id     Int      @unique
+}
+
+// Определение модели Личной страховки
+model PersonalInsurance {
+  id             Int                         @id @unique @default(autoincrement())
+  has_insurance  Boolean
+  insurance_date DateTime?
+  athlete        Athlete                     @relation(fields: [athlete_id], references: [id])
+  athlete_id     Int                         @unique
+  document       PersonalInsuranceDocument[]
+}
+
+// Определение модели Документ Личной страховки
+model PersonalInsuranceDocument {
+  id                  Int               @id @unique @default(autoincrement())
+  document_name       String
+  document_photo      String
+  personal_insures    PersonalInsurance @relation(fields: [personal_insures_id], references: [id])
+  personal_insures_id Int
+  createdAt           DateTime          @db.Date
+}
+
+// Определение модели Чир мгновение
+model Membership {
+  id                     Int                   @id @unique @default(autoincrement())
+  has_membership         Boolean
+  membership_certificate String?
+  one_time_payment_id    Int?
+  annual_fee_payment_id  Int?
+  sccr_application       String?
+  athlete                AthleteOnMembership[]
+}
+
+// Определение модели Документа Спортсмена
+model AthleteDocument {
+  id             Int      @id @unique @default(autoincrement())
+  document_name  String
+  document_photo String
+  athlete        Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id     Int
+  createdAt      DateTime @db.Date
+}
+
+// Определение модели Документа Тренера
+model TrainerDocument {
+  id             Int      @id @unique @default(autoincrement())
+  document_name  String
+  document_photo String
+  trainer        Trainer  @relation(fields: [trainer_id], references: [id])
+  trainer_id     Int
+  createdAt      DateTime @db.Date
+}
+
+// Определение модели Оплаты
+model Payment {
+  id              Int      @id @unique @default(autoincrement())
+  payment_date    DateTime
+  payment_receipt String
+  createdAt       DateTime @db.Date
+}
+
+model SubscriptionPayment {
+  id              Int      @id @unique @default(autoincrement())
+  payment_date    DateTime
+  payment_receipt String
+  Athlete         Athlete? @relation(fields: [athlete_id], references: [id])
+  athlete_id      Int?
+  createdAt       DateTime @db.Date
+}
+
+model AthelteOnTeam {
+  athlete    Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id Int
+  team       Team     @relation(fields: [team_id], references: [id])
+  team_id    Int
+  assignedAt DateTime @default(now())
+  assignedBy String
+
+  @@id([athlete_id, team_id])
+}
+
+model AthelteOnParent {
+  athlete    Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id Int
+  parent     Parent   @relation(fields: [parent_id], references: [id])
+  parent_id  Int
+  assignedAt DateTime @default(now())
+  assignedBy String
+
+  @@id([athlete_id, parent_id])
+}
+
+model AthleteOnMembership {
+  athlete       Athlete    @relation(fields: [athlete_id], references: [id])
+  athlete_id    Int
+  membership    Membership @relation(fields: [membership_id], references: [id])
+  membership_id Int
+  assignedAt    DateTime   @default(now())
+  assignedBy    String
+
+  @@id([athlete_id, membership_id])
+}
+
+model TrainerOnTeam {
+  trainer    Trainer  @relation(fields: [trainer_id], references: [id])
+  trainer_id Int
+  team       Team     @relation(fields: [team_id], references: [id])
+  team_id    Int
+  assignedAt DateTime @default(now())
+  assignedBy String
+
+  @@id([trainer_id, team_id])
+}
