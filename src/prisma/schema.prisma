@@ -9,27 +9,38 @@ datasource db {
 }
 
 model User {
-  id       Int    @id @unique @default(autoincrement())
-  login    String @unique
-  password String
-  role     Role   @default(TRAINER)
+  id        Int      @id @unique @default(autoincrement())
+  login     String   @unique
+  password  String
+  role      Role     @default(ATHLETE)
+  trainer   Trainer?
+  athlete   Athlete?
+  parent    Parent?
+  createdAt DateTime @default(now())
 }
 
 enum Role {
   ADMIN
   MODERATOR
   TRAINER
+  ATHLETE
+  PARENT
 }
 
 // Определение модели Тренера
 model Trainer {
   id            Int               @id @unique @default(autoincrement())
-  full_name     String
-  date_of_birth DateTime
-  home_address  String
-  phone_number  String
+  user          User              @relation(fields: [user_id], references: [id])
+  user_id       Int               @unique
+  name          String
+  surname       String
+  patronymic    String?
+  date_of_birth DateTime?
+  home_address  String?
+  phone_number  String?
   teams         TrainerOnTeam[]
   document      TrainerDocument[]
+  createdAt     DateTime          @default(now())
 }
 
 // Определение модели Команды
@@ -38,83 +49,127 @@ model Team {
   team_name String
   trainer   TrainerOnTeam[]
   athletes  AthelteOnTeam[]
+  createdAt DateTime        @default(now())
 }
 
 // Определение модели Спортсмена
 model Athlete {
   id                  Int                   @id @unique @default(autoincrement())
-  full_name           String
+  user                User                  @relation(fields: [user_id], references: [id])
+  user_id             Int                   @unique
+  name                String
+  surname             String
+  patronymic          String?
   date_of_birth       DateTime?
   home_address        String?
   school_name         String?
   join_date           DateTime?
-  initial_fee_amount  Float?
-  initial_fee_date    DateTime?
-  monthly_fee_amount  Float?
-  discount            Float?
-  has_discount        Boolean
+  initial_fee         InitialFeePayment?
+  monthly_fee         MonthlyFeePayment[]
+  discount            Float                 @default(0)
   additional_info     String?
   insurance_from_club ClubInsurance?
   personal_insurance  PersonalInsurance?
   medical_examination MedicalExamination?
   memberships         AthleteOnMembership[]
-  documents           AthleteDocument[]
+  document            AthleteDocument[]
   payments            SubscriptionPayment[]
   parents             AthelteOnParent[]
   Team                AthelteOnTeam[]
-  createdAt           DateTime              @db.Date
+  createdAt           DateTime              @default(now())
+}
+
+// Определение модели Пробная Оплата Спортсмена
+model InitialFeePayment {
+  id          Int      @id @unique @default(autoincrement())
+  description String?
+  image       String
+  athlete     Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id  Int      @unique
+  createdAt   DateTime @default(now())
+}
+
+// Определение модели Месячная Оплата Спортсмена
+model MonthlyFeePayment {
+  id          Int      @id @unique @default(autoincrement())
+  description String?
+  image       String
+  athlete     Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id  Int
+  createdAt   DateTime @default(now())
 }
 
 // Определение модели Родителя
 model Parent {
-  id                   Int               @id @unique @default(autoincrement())
-  full_name            String
-  relationship         String?
-  workplace            String?
-  contact_phone        String?
-  parent_document_copy ParentDocument[]
-  athletes             AthelteOnParent[]
-  createdAt            DateTime          @db.Date
+  id            Int               @id @unique @default(autoincrement())
+  user          User              @relation(fields: [user_id], references: [id])
+  user_id       Int               @unique
+  full_name     String
+  relationship  String?
+  workplace     String?
+  contact_phone String?
+  document      ParentDocument[]
+  athletes      AthelteOnParent[]
+  createdAt     DateTime          @default(now())
 }
 
 // Определение модели Документ Родителя
 model ParentDocument {
-  id             Int      @id @unique @default(autoincrement())
-  document_name  String
-  document_photo String
-  parent         Parent   @relation(fields: [parent_id], references: [id])
-  parent_id      Int
-  createdAt      DateTime @db.Date
+  id            Int      @id @unique @default(autoincrement())
+  document_name String
+  image         String
+  parent        Parent   @relation(fields: [parent_id], references: [id])
+  parent_id     Int
+  createdAt     DateTime @default(now())
 }
 
 // Определение модели Медицинского обследования
 model MedicalExamination {
-  id                Int       @id @unique @default(autoincrement())
-  from_club         Boolean
-  independent       Boolean
-  medical_report    String?
+  id                Int               @id @unique @default(autoincrement())
+  from_club         Boolean           @default(false)
+  independent       Boolean           @default(false)
+  document          MedicalDocument[]
   examination_date  DateTime?
   contraindications String?
   chronic_illnesses String?
   allergies         String?
   additional_info   String?
-  athlete           Athlete   @relation(fields: [athlete_id], references: [id])
-  athlete_id        Int       @unique
+  athlete           Athlete           @relation(fields: [athlete_id], references: [id])
+  athlete_id        Int               @unique
+}
+
+// Определение модели Документ Медицинаская страховка
+model MedicalDocument {
+  id                     Int                @id @unique @default(autoincrement())
+  document_name          String
+  image                  String
+  medical_examination    MedicalExamination @relation(fields: [medical_examination_id], references: [id])
+  medical_examination_id Int
+  createdAt              DateTime           @default(now())
 }
 
 // Определение модели Страховки от клуба
 model ClubInsurance {
-  id             Int      @id @unique @default(autoincrement())
-  has_insurance  Boolean
+  id             Int                     @id @unique @default(autoincrement())
   insurance_date DateTime
-  athlete        Athlete  @relation(fields: [athlete_id], references: [id])
-  athlete_id     Int      @unique
+  document       ClubInsuranceDocument[]
+  athlete        Athlete                 @relation(fields: [athlete_id], references: [id])
+  athlete_id     Int                     @unique
+}
+
+// Определение модели Документ Страховки от клуба
+model ClubInsuranceDocument {
+  id                Int           @id @unique @default(autoincrement())
+  document_name     String
+  image             String
+  club_insurance    ClubInsurance @relation(fields: [club_insurance_id], references: [id])
+  club_insurance_id Int
+  createdAt         DateTime      @default(now())
 }
 
 // Определение модели Личной страховки
 model PersonalInsurance {
   id             Int                         @id @unique @default(autoincrement())
-  has_insurance  Boolean
   insurance_date DateTime?
   athlete        Athlete                     @relation(fields: [athlete_id], references: [id])
   athlete_id     Int                         @unique
@@ -125,49 +180,82 @@ model PersonalInsurance {
 model PersonalInsuranceDocument {
   id                  Int               @id @unique @default(autoincrement())
   document_name       String
-  document_photo      String
+  image               String
   personal_insures    PersonalInsurance @relation(fields: [personal_insures_id], references: [id])
   personal_insures_id Int
-  createdAt           DateTime          @db.Date
+  createdAt           DateTime          @default(now())
 }
 
 // Определение модели Чир мгновение
 model Membership {
-  id                     Int                   @id @unique @default(autoincrement())
-  has_membership         Boolean
-  membership_certificate String?
-  one_time_payment_id    Int?
-  annual_fee_payment_id  Int?
-  sccr_application       String?
-  athlete                AthleteOnMembership[]
+  id               Int                         @id @unique @default(autoincrement())
+  has_membership   Boolean                     @default(false)
+  certificate      MembershipCertificate[]
+  one_time_payment OneTimePaymentMembership?
+  annual_payment   MonthlyPaymentMembership[]
+  sccr_application SccrApplicationMembership[]
+  athlete          AthleteOnMembership[]
+}
+
+// Определение модели Документ заявление о вступлении в СЧСЧР
+model SccrApplicationMembership {
+  id            Int        @id @unique @default(autoincrement())
+  description   String?
+  image         String
+  membership    Membership @relation(fields: [membership_id], references: [id])
+  membership_id Int
+  createdAt     DateTime   @default(now())
+}
+
+// Определение модели Единоразовая Оплата ЧИР Мгновения
+model OneTimePaymentMembership {
+  id            Int        @id @unique @default(autoincrement())
+  description   String?
+  image         String
+  membership    Membership @relation(fields: [membership_id], references: [id])
+  membership_id Int        @unique
+  createdAt     DateTime   @default(now())
+}
+
+// Определение модели Единоразовая Оплата ЧИР Мгновения
+model MonthlyPaymentMembership {
+  id            Int        @id @unique @default(autoincrement())
+  description   String?
+  image         String
+  date          DateTime
+  membership    Membership @relation(fields: [membership_id], references: [id])
+  membership_id Int
+  createdAt     DateTime   @default(now())
+}
+
+// Определение модели Документ Личной страховки
+model MembershipCertificate {
+  id            Int        @id @unique @default(autoincrement())
+  document_name String
+  image         String
+  membership    Membership @relation(fields: [membership_id], references: [id])
+  membership_id Int
+  createdAt     DateTime   @default(now())
 }
 
 // Определение модели Документа Спортсмена
 model AthleteDocument {
-  id             Int      @id @unique @default(autoincrement())
-  document_name  String
-  document_photo String
-  athlete        Athlete  @relation(fields: [athlete_id], references: [id])
-  athlete_id     Int
-  createdAt      DateTime @db.Date
+  id            Int      @id @unique @default(autoincrement())
+  document_name String
+  image         String
+  athlete       Athlete  @relation(fields: [athlete_id], references: [id])
+  athlete_id    Int
+  createdAt     DateTime @default(now())
 }
 
 // Определение модели Документа Тренера
 model TrainerDocument {
-  id             Int      @id @unique @default(autoincrement())
-  document_name  String
-  document_photo String
-  trainer        Trainer  @relation(fields: [trainer_id], references: [id])
-  trainer_id     Int
-  createdAt      DateTime @db.Date
-}
-
-// Определение модели Оплаты
-model Payment {
-  id              Int      @id @unique @default(autoincrement())
-  payment_date    DateTime
-  payment_receipt String
-  createdAt       DateTime @db.Date
+  id            Int      @id @unique @default(autoincrement())
+  document_name String
+  image         String
+  trainer       Trainer  @relation(fields: [trainer_id], references: [id])
+  trainer_id    Int
+  createdAt     DateTime @default(now())
 }
 
 model SubscriptionPayment {
@@ -176,7 +264,7 @@ model SubscriptionPayment {
   payment_receipt String
   Athlete         Athlete? @relation(fields: [athlete_id], references: [id])
   athlete_id      Int?
-  createdAt       DateTime @db.Date
+  createdAt       DateTime @default(now())
 }
 
 model AthelteOnTeam {

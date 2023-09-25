@@ -11,7 +11,7 @@ module.exports = (req, res, next) => {
     console.log(req.headers);
 
     if (!token) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(401).json({ message: 'Не авторизован' });
     }
 
     req.body.user = jwt.verify(token, process.env.SECRET_KEY || 'secret');
@@ -20,6 +20,6 @@ module.exports = (req, res, next) => {
 
     next();
   } catch (e) {
-    res.status(401).json({ message: 'Not authorized' });
+    res.status(401).json({ message: 'Не авторизован' });
   }
 };

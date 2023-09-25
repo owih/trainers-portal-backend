@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-module.exports = (role) => {
+module.exports = (roles) => {
   return (req, res, next) => {
     if (req.method === 'OPTIONS') {
       next();
@@ -9,7 +9,7 @@ module.exports = (role) => {
       const token = req.headers?.authorization?.split(' ')[1];
 
       if (!token) {
-        return res.status(401).json({ message: 'Not authorized' });
+        return res.status(401).json({ message: 'Не авторизован' });
       }
 
       const decoded = jwt.verify(
@@ -17,14 +17,14 @@ module.exports = (role) => {
         process.env.SECRET_KEY || 'secret',
       );
 
-      if (decoded.role !== role) {
-        return res.status(401).json({ message: 'No access' });
+      if (!roles.include(decoded.role)) {
+        return res.status(403).json({ message: 'Нет доступа' });
       }
 
       req.body.user = decoded;
       next();
     } catch (e) {
-      return res.status(401).json({ message: 'Not authorized' });
+      return res.status(401).json({ message: 'Ошибка' });
     }
   };
 };
