@@ -9,14 +9,15 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @unique @default(autoincrement())
-  login     String   @unique
-  password  String
-  role      Role     @default(ATHLETE)
-  trainer   Trainer?
-  athlete   Athlete?
-  parent    Parent?
-  createdAt DateTime @default(now())
+  id          Int      @id @unique @default(autoincrement())
+  login       String   @unique
+  password    String
+  role        Role     @default(ATHLETE)
+  trainer     Trainer?
+  athlete     Athlete?
+  parent      Parent?
+  is_disabled Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
 
 enum Role {
@@ -32,8 +33,8 @@ model Trainer {
   id            Int               @id @unique @default(autoincrement())
   user          User              @relation(fields: [user_id], references: [id])
   user_id       Int               @unique
-  name          String
-  surname       String
+  name          String?
+  surname       String?
   patronymic    String?
   date_of_birth DateTime?
   home_address  String?
@@ -57,8 +58,8 @@ model Athlete {
   id                  Int                   @id @unique @default(autoincrement())
   user                User                  @relation(fields: [user_id], references: [id])
   user_id             Int                   @unique
-  name                String
-  surname             String
+  name                String?
+  surname             String?
   patronymic          String?
   date_of_birth       DateTime?
   home_address        String?
@@ -104,7 +105,9 @@ model Parent {
   id            Int               @id @unique @default(autoincrement())
   user          User              @relation(fields: [user_id], references: [id])
   user_id       Int               @unique
-  full_name     String
+  name          String?
+  surname       String?
+  patronymic    String?
   relationship  String?
   workplace     String?
   contact_phone String?

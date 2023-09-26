@@ -15,6 +15,20 @@ const generateJwt = ({ id, email, role }) => {
   );
 };
 
+const getAllowedRoles = (role) => {
+  let allowedRolesToCreate = [roles.ATHLETE, roles.PARENT];
+
+  if ([roles.ADMIN, roles.MODERATOR].includes(role)) {
+    allowedRolesToCreate.push(roles.TRAINER);
+  }
+
+  if (role === roles.ADMIN) {
+    allowedRolesToCreate.push(roles.MODERATOR);
+  }
+
+  return allowedRolesToCreate;
+};
+
 class UserController {
   async registration(req, res, next) {
     try {
@@ -22,14 +36,12 @@ class UserController {
         login,
         password,
         role,
-        name,
-        surname,
       } = req.body;
 
       console.log(req.body, 'req.body registration');
 
-      if (!login || !password) {
-        return next(ApiError.badRequest('Заполните логин и пароль'));
+      if (!password || password.length < 4) {
+        return next(ApiError.badRequest('Длина пароля должна быть больше 4'));
       }
 
       if (!rolesToRegistration.includes(role)) {
@@ -58,8 +70,6 @@ class UserController {
         const athlete = await prisma.athlete.create({
           data: {
             user_id: user.id,
-            name,
-            surname,
           }
         });
         await prisma.user.update({
@@ -76,8 +86,6 @@ class UserController {
         const parent = await prisma.parent.create({
           data: {
             user_id: user.id,
-            name,
-            surname,
           }
         });
         await prisma.user.update({
@@ -146,29 +154,18 @@ class UserController {
 
   async create(req, res, next) {
     try {
-      let allowedRolesToCreate = [roles.ATHLETE, roles.PARENT];
-
-      if ([roles.ADMIN, roles.MODERATOR].includes(req.body.user.role)) {
-        allowedRolesToCreate.push(roles.TRAINER);
-      }
-
-      if (req.body.user.role === roles.ADMIN) {
-        allowedRolesToCreate.push(roles.MODERATOR);
-      }
-
+      const allowedRolesToCreate = getAllowedRoles(req.user.role);
       const {
         login,
         password,
         role,
-        name,
-        surname,
       } = req.body;
 
       if (!allowedRolesToCreate.includes(role)) {
         return next(ApiError.badRequest('Недостаточно прав для создания роли ' + role));
       }
 
-      if (!login || !password || !role || !name || !surname) {
+      if (!password || password.length < 4) {
         return next(ApiError.badRequest('Заполните все данные для создания аккаунта'));
       }
 
@@ -194,59 +191,13 @@ class UserController {
         },
       });
 
-      if (role === roles.ATHLETE) {
-        const athlete = await prisma.athlete.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            athlete,
-          }
-        });
-      }
+      const formattedRoleToCreate = role.toLowerCase();
 
-      if (role === roles.PARENT) {
-        const parent = await prisma.parent.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            parent,
-          }
-        });
-      }
-
-      if (role === roles.TRAINER) {
-        const trainer = await prisma.trainer.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            trainer,
-          }
-        });
-      }
+      await prisma[formattedRoleToCreate].create({
+        data: {
+          user_id: user.id,
+        }
+      });
 
       return res.status(200);
     } catch (e) {
@@ -257,107 +208,70 @@ class UserController {
 
   async update(req, res, next) {
     try {
+      const allowedRolesToCreate = getAllowedRoles(req.user.role);
       const {
         id,
         login,
         password,
         role,
-        name,
-        surname,
       } = req.body;
 
-      console.log(req.body, 'req.body registration');
 
-      if (!login || !password) {
-        return next(ApiError.badRequest('Заполните логин и пароль'));
+      if (!allowedRolesToCreate.includes(role)) {
+        return next(ApiError.badRequest('Недостаточно прав для редактирования роли ' + role));
       }
 
-      if (!rolesToCreate.includes(role)) {
-        return next(ApiError.badRequest('Недоступная роль для регистрации'));
+      if (password && password.length < 4) {
+        return next(ApiError.badRequest('Длина пароля должна быть больше 4'));
       }
 
-      const userWithRequestLogin = await prisma.user.findFirst({
-        where: { login },
+      const user = await prisma.user.findUnique({
+        where: { id },
       });
 
-      if (userWithRequestLogin) {
-        return next(ApiError.badRequest('Данный логин уже занят'));
+      if (!user) {
+        return next(ApiError.badRequest('Пользователь не найдет'));
       }
 
-      const hashPassword = await bcrypt.hash(password, 3);
+      let hashPassword = '';
+      if (password) {
+        hashPassword = await bcrypt.hash(password, 3);
+      }
 
-      const user = await prisma.user.create({
+      const updatedUser = await prisma.user.update({
+        where: {
+          id,
+        },
         data: {
           login,
-          password: hashPassword,
+          password: hashPassword ? hashPassword : user.password,
           role,
         },
       });
 
-      if (role === roles.ATHLETE) {
-        const athlete = await prisma.athlete.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            athlete,
-          }
-        });
+      if (user.role === role) {
+        return;
       }
 
-      if (role === roles.PARENT) {
-        const parent = await prisma.parent.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            parent,
-          }
-        });
-      }
+      const formattedRoleToUpdate = role.toLowerCase();
+      const formattedRoleToDelete = user.role.toLowerCase();
 
-      if (role === roles.TRAINER) {
-        const trainer = await prisma.trainer.create({
-          data: {
-            user_id: user.id,
-            name,
-            surname,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            trainer,
-          }
-        });
-      }
+      await prisma[formattedRoleToDelete].delete({
+        where: {
+          user_id: user.id,
+        }
+      });
 
-      const token = generateJwt({
-        id: user.id,
-        login: user.login,
-        role: user.role,
+      await prisma[formattedRoleToUpdate].create({
+        data: {
+          user_id: user.id,
+        }
       });
 
       return res.status(200);
     } catch (e) {
       console.log('catch');
-      return next(ApiError.internal('Ошибка регистрации'));
+      return next(ApiError.internal('Ошибка обновления данных пользователя'));
     }
   }
 }
