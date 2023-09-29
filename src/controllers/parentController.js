@@ -1,7 +1,7 @@
 const ApiError = require('../error/ApiError');
 const prisma = require('../prisma');
 
-class TrainerController {
+class ParentController {
   async get(req, res, next) {
     try {
       const { id } = req.body;
@@ -10,13 +10,13 @@ class TrainerController {
         return next(ApiError.badRequest('Ошибка идентификатора'));
       }
 
-      const trainer = await prisma.trainer.findUnique({
+      const parent = await prisma.parent.findUnique({
         where: {
           id: Number(id),
         },
       });
 
-      return res.status(200).json({ role: trainer });
+      return res.status(200).json({ role: parent });
     } catch (e) {
       return next(ApiError.internal('Ошибка при получении профиля'));
     }
@@ -29,12 +29,13 @@ class TrainerController {
         name,
         surname,
         patronymic,
-        date_of_birth,
-        home_address,
+        workplace,
+        relation,
+        relation_description,
         phone_number,
       } = req.body;
 
-      const updatedTrainer = await prisma.trainer.update({
+      const updatedParent = await prisma.parent.update({
         where: {
           id,
         },
@@ -42,17 +43,18 @@ class TrainerController {
           name,
           surname,
           patronymic,
-          date_of_birth,
-          home_address,
+          relation,
+          relation_description,
+          workplace,
           phone_number,
         },
       });
 
-      return res.status(200).json({ role: updatedTrainer });
+      return res.status(200).json({ role: updatedParent });
     } catch (e) {
       return next(ApiError.internal('Ошибка при обновлении данных'));
     }
   }
 }
 
-module.exports = new TrainerController();
+module.exports = new ParentController();

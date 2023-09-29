@@ -9,7 +9,7 @@ const fileUpload = require('express-fileupload');
 
 dotenv.config();
 
-const port = process.env.PORT || 9000; 
+const port = process.env.PORT || 9000;
 const app = express();
 
 app.use(morgan('dev'));
@@ -21,6 +21,6 @@ app.use('/api', router);
 
 app.use(errorMiddleWare);
 
-app.listen(9000, () => {
+app.listen(port, () => {
   console.log(`Starting Server on Port ${port}`);
 });

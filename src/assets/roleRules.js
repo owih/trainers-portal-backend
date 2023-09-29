@@ -6,12 +6,19 @@ const roles = {
   PARENT: 'PARENT',
 };
 
-const rolesToRegistration = [roles.ATHLETE, roles.PARENT];
-
-const rolesToCreate = [roles.ATHLETE, roles.PARENT, roles.TRAINER, roles.TRAINER];
+const rolesToCreate = [roles.ATHLETE, roles.PARENT, roles.TRAINER];
+const rolesWithCreatePermission = [roles.ADMIN, roles.MODERATOR];
+const rolesWithDeletePermission = [roles.ADMIN, roles.MODERATOR];
+const rolesWithUpdatePermission = [roles.ADMIN, roles.MODERATOR];
+const rolesAsModeration = [roles.ADMIN, roles.MODERATOR];
+const rolesWithProfiles = [roles.TRAINER];
 
 module.exports = {
   roles,
-  rolesToRegistration,
   rolesToCreate,
+  rolesWithCreatePermission,
+  rolesWithDeletePermission,
+  rolesWithUpdatePermission,
+  rolesAsModeration,
+  rolesWithProfiles,
 };

@@ -3,33 +3,85 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../prisma');
 const dotenv = require('dotenv');
-const {rolesToRegistration, roles, rolesToCreate} = require("../assets/roleRules");
+const {roles, rolesToCreate, rolesWithProfiles} = require("../assets/roleRules");
 
 dotenv.config();
 
-const generateJwt = ({ id, email, role }) => {
+const generateJwt = ({ id, login, role, is_disabled }) => {
   return jwt.sign(
-    { id, email, role },
+    { id, login, role, is_disabled },
     process.env.SECRET_KEY || 'secret',
     { expiresIn: '62h' }
   );
 };
 
 const getAllowedRoles = (role) => {
-  let allowedRolesToCreate = [roles.ATHLETE, roles.PARENT];
+  let allowedRolesToCreate = [];
 
   if ([roles.ADMIN, roles.MODERATOR].includes(role)) {
     allowedRolesToCreate.push(roles.TRAINER);
   }
 
   if (role === roles.ADMIN) {
-    allowedRolesToCreate.push(roles.MODERATOR);
+    allowedRolesToCreate.push(roles.ADMIN, roles.MODERATOR);
   }
 
   return allowedRolesToCreate;
 };
 
+const getUserToResponse = (user) => {
+  return {
+    id: user.id,
+    login: user.login,
+    role: user.role,
+    is_disabled: user.is_disabled,
+  };
+};
+
 class UserController {
+  async getWithRoleInfo(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      if (!Number(id)) {
+        return next(ApiError.badRequest('Ошибка идентификатора'));
+      }
+
+      const user = await prisma.user.findUnique({
+        where: {
+          id: Number(id),
+        },
+        include: {
+          trainer: true,
+        }
+      });
+
+      if (!user) {
+        return next(ApiError.badRequest('Пользователь не найден'));
+      }
+
+      console.log(user, 'user');
+
+      const userToResponse = getUserToResponse(user);
+      const formattedUserRole = user.role.toLowerCase();
+
+      if (!rolesWithProfiles.includes(user.role)) {
+        return res.status(200).json({ user: userToResponse, role: null });
+      }
+
+      const role = await prisma[formattedUserRole].findUnique({
+        where: {
+          user_id: user.id,
+        }
+      });
+
+      return res.status(200).json({ user: userToResponse, role });
+    } catch (e) {
+      console.log(e, 'catch');
+      return next(ApiError.internal('Ошибка обновления данных пользователя'));
+    }
+  }
+
   async registration(req, res, next) {
     try {
       const {
@@ -42,10 +94,6 @@ class UserController {
 
       if (!password || password.length < 4) {
         return next(ApiError.badRequest('Длина пароля должна быть больше 4'));
-      }
-
-      if (!rolesToRegistration.includes(role)) {
-        return next(ApiError.badRequest('Недоступная роль для регистрации'));
       }
 
       const userWithRequestLogin = await prisma.user.findFirst({
@@ -66,38 +114,15 @@ class UserController {
         },
       });
 
-      if (role === roles.ATHLETE) {
-        const athlete = await prisma.athlete.create({
-          data: {
-            user_id: user.id,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            athlete,
-          }
-        });
-      }
+      const formattedRoleToCreate = role.toLowerCase();
 
-      if (role === roles.PARENT) {
-        const parent = await prisma.parent.create({
-          data: {
-            user_id: user.id,
-          }
-        });
-        await prisma.user.update({
-          where: {
-            id: user.id,
-          },
-          data: {
-            parent,
-          }
-        });
-      }
+      await prisma[formattedRoleToCreate].create({
+        data: {
+          user_id: user.id,
+        }
+      });
 
+      console.log(res, 'res');
       return res.status(200);
     } catch (e) {
       console.log('catch');
@@ -108,11 +133,14 @@ class UserController {
   async login(req, res, next) {
     console.log(req.body);
     try {
-      const { login, password } = req.body;
+      const login = req.body.login.toLowerCase();
+      const { password } = req.body;
 
-      const user = await prisma.user.findFirst({
+      const user = await prisma.user.findUnique({
         where: { login },
       });
+
+      console.log(user, 'user');
 
       if (!user) {
         return next(ApiError.badRequest('Пользователь не найден'));
@@ -128,9 +156,12 @@ class UserController {
         id: user.id,
         login: user.login,
         role: user.role,
+        is_disabled: user.is_disabled,
       });
 
-      return res.status(200).json({ token });
+      const userToResponse = getUserToResponse(user);
+
+      return res.status(200).json({ user: userToResponse, token });
     } catch (e) {
       return next(ApiError.internal('Ошибка авторизации'));
     }
@@ -144,9 +175,11 @@ class UserController {
         id: user.id,
         login: user.login,
         role: user.role,
+        is_disabled: user.is_disabled,
       });
+      const userToResponse = getUserToResponse(user);
 
-      return res.status(200).json({ token });
+      return res.status(200).json({ user: userToResponse, token });
     } catch (e) {
       return next(ApiError.internal('Ошибка'));
     }
@@ -154,7 +187,7 @@ class UserController {
 
   async create(req, res, next) {
     try {
-      const allowedRolesToCreate = getAllowedRoles(req.user.role);
+      const allowedRolesToCreate = getAllowedRoles(req.body.user.role);
       const {
         login,
         password,
@@ -199,7 +232,9 @@ class UserController {
         }
       });
 
-      return res.status(200);
+      const userToResponse = getUserToResponse(user);
+
+      return res.status(200).json({ user: userToResponse });
     } catch (e) {
       console.log('catch');
       return next(ApiError.internal('Ошибка регистрации'));
@@ -208,26 +243,35 @@ class UserController {
 
   async update(req, res, next) {
     try {
-      const allowedRolesToCreate = getAllowedRoles(req.user.role);
+      console.log(req.body, 'req.body');
+      console.log(req.body.user, 'req.body.user');
+      const allowedRolesToUpdate = getAllowedRoles(req.body.user.role);
+      const login = req.body.login.toLowerCase();
       const {
         id,
-        login,
         password,
+        repeatPassword,
         role,
+        is_disabled,
       } = req.body;
+      console.log('after req body');
 
-
-      if (!allowedRolesToCreate.includes(role)) {
+      if (!allowedRolesToUpdate.includes(role)) {
         return next(ApiError.badRequest('Недостаточно прав для редактирования роли ' + role));
       }
 
-      if (password && password.length < 4) {
-        return next(ApiError.badRequest('Длина пароля должна быть больше 4'));
+      console.log(id, 'id');
+      console.log(Number(id), 'Number(id)');
+
+      if (password && (password.length < 6 || password !== repeatPassword)) {
+        return next(ApiError.badRequest('Длина пароля должна быть больше 6'));
       }
 
       const user = await prisma.user.findUnique({
-        where: { id },
+        where: { id: Number(id) },
       });
+
+      console.log(user, 'update user');
 
       if (!user) {
         return next(ApiError.badRequest('Пользователь не найдет'));
@@ -238,19 +282,31 @@ class UserController {
         hashPassword = await bcrypt.hash(password, 3);
       }
 
+      const roleToUpdate = id === req.body.user.id ? req.body.user.role : role;
+      const updateUserData = {
+        login,
+        password: hashPassword ? hashPassword : user.password,
+        role: roleToUpdate,
+        is_disabled,
+      };
+
+      if (user.role === roles.TRAINER && role !== roles.TRAINER) {
+        updateUserData.trainer = null;
+      }
+
       const updatedUser = await prisma.user.update({
         where: {
           id,
         },
-        data: {
-          login,
-          password: hashPassword ? hashPassword : user.password,
-          role,
-        },
+        data: updateUserData,
       });
 
-      if (user.role === role) {
-        return;
+      console.log(updatedUser, 'updatedUser');
+
+      const userToResponse = getUserToResponse(updatedUser);
+
+      if (user.role === role || user.role === roles.ADMIN) {
+        return res.status(200).json({ user: userToResponse, role: null });
       }
 
       const formattedRoleToUpdate = role.toLowerCase();
@@ -262,16 +318,37 @@ class UserController {
         }
       });
 
-      await prisma[formattedRoleToUpdate].create({
+      const updatedRole = await prisma[formattedRoleToUpdate].create({
         data: {
           user_id: user.id,
         }
       });
 
+
+      return res.status(200).json({ user: userToResponse, role: updatedRole });
+    } catch (e) {
+      console.log(e, 'catch');
+      return next(ApiError.internal('Ошибка обновления данных пользователя'));
+    }
+  }
+
+  async delete(req, res, next) {
+    try {
+      const { id } = req.body;
+
+
+      if (!id) {
+        return next(ApiError.badRequest('Неверный идентификатор пользователя'));
+      }
+
+      await prisma.user.delete({
+        where: { id },
+      });
+
       return res.status(200);
     } catch (e) {
       console.log('catch');
-      return next(ApiError.internal('Ошибка обновления данных пользователя'));
+      return next(ApiError.internal('Ошибка удаления пользователя'));
     }
   }
 }

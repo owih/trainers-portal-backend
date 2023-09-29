@@ -6,22 +6,10 @@ module.exports = (roles) => {
       next();
     }
     try {
-      const token = req.headers?.authorization?.split(' ')[1];
-
-      if (!token) {
-        return res.status(401).json({ message: 'Не авторизован' });
-      }
-
-      const decoded = jwt.verify(
-        token,
-        process.env.SECRET_KEY || 'secret',
-      );
-
-      if (!roles.include(decoded.role)) {
+      if (!roles.includes(req.body.user.role)) {
         return res.status(403).json({ message: 'Нет доступа' });
       }
 
-      req.body.user = decoded;
       next();
     } catch (e) {
       return res.status(401).json({ message: 'Ошибка' });

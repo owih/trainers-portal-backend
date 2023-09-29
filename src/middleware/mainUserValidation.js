@@ -7,8 +7,10 @@ module.exports = (req, res, next) => {
       role,
     } = req.body;
 
-    if (!login || login.length < 3 || !role || !roles.includes(role)) {
-      next(ApiError.badRequest('Заполните данные'));
+    console.log(req.body, 'req.body');
+
+    if (!login || login.length < 3 || !role || !roles.role) {
+      // next(ApiError.badRequest('Заполните данные'));
     }
 
     next();
